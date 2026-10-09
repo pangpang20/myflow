@@ -102,6 +102,11 @@ async function writeCurrentChapter(storage, slug, chapter) {
   return metadata;
 }
 
+async function clearPostHoc(storage, slug, chapterNumber) {
+  const { root } = chapterDirectory(storage, slug, chapterNumber);
+  await fs.rm(path.join(root, "post-hoc.json"), { force: true });
+}
+
 async function createVersion(storage, slug, chapter, source) {
   const { root } = chapterDirectory(storage, slug, chapter.number);
   const version = {
@@ -228,6 +233,7 @@ async function generateChapter(storage, slug, chapterNumber, input, source, engi
     targetWordCount: result.targetWordCount,
     content: result.content,
   };
+  await clearPostHoc(storage, slug, number);
   await writeCurrentChapter(storage, slug, chapter);
   return {
     run: {
@@ -247,6 +253,7 @@ async function generateChapter(storage, slug, chapterNumber, input, source, engi
 }
 
 export async function listChapters(storage, slug) {
+  await storage.getBook(slug);
   const root = path.join(storage.bookDir(slug), "story");
   try {
     const entries = await fs.readdir(root, { withFileTypes: true });
@@ -296,11 +303,13 @@ export async function saveChapter(storage, slug, chapterNumber, input = {}) {
     finalizedAt: undefined,
     postHocPath: undefined,
   };
+  await clearPostHoc(storage, slug, chapter.number);
   await writeCurrentChapter(storage, slug, chapter);
   return { chapter: { ...chapter, content: undefined }, content, versionId: version.id };
 }
 
 export async function listChapterVersions(storage, slug, chapterNumber) {
+  await storage.getBook(slug);
   const { root, number } = chapterDirectory(storage, slug, chapterNumber);
   const versionsRoot = path.join(root, "versions");
   try {
@@ -340,6 +349,7 @@ export async function restoreChapterVersion(storage, slug, chapterNumber, versio
     finalizedAt: undefined,
     postHocPath: undefined,
   };
+  await clearPostHoc(storage, slug, chapter.number);
   await writeCurrentChapter(storage, slug, chapter);
   return { chapter: { ...chapter, content: undefined }, content: chapter.content, restoredFrom: version.id };
 }
@@ -358,6 +368,7 @@ export async function polishChapter(storage, slug, chapterNumber, engine = new M
     finalizedAt: undefined,
     postHocPath: undefined,
   };
+  await clearPostHoc(storage, slug, chapter.number);
   await writeCurrentChapter(storage, slug, chapter);
   return { chapter: { ...chapter, content: undefined }, content, versionId: version.id, summary: "章节润色完成。" };
 }
@@ -405,4 +416,3 @@ export async function exportChapters(storage, slug, options = {}) {
     content,
   };
 }
-
