@@ -181,6 +181,22 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
           sendJson(response, 200, { path: parts.slice(4).join("/"), content: await storage.readBookText(parts[2], parts.slice(4).join("/")) });
           return;
         }
+        if (parts.length >= 5 && parts[3] === "files" && request.method === "PUT") {
+          const filePath = parts.slice(4).join("/");
+          const editableFiles = new Set([
+            "meta/world_foundation.md", "meta/character_profiles.md", "meta/story_plan.md",
+            "outline/volume_outline.md", "outline/near_term_outline.md",
+          ]);
+          if (!editableFiles.has(filePath)) throw new StorageError("该资料不可编辑", 403);
+          await storage.readBookText(parts[2], filePath);
+          const body = await readBody(request);
+          if (typeof body.content !== "string" || body.content.trim() === "" || body.content.length > 500_000) {
+            throw new StorageError("资料内容不能为空且不能超过 500000 字", 400);
+          }
+          await storage.writeBookText(parts[2], filePath, body.content);
+          sendJson(response, 200, { path: filePath, saved: true });
+          return;
+        }
       }
       await serveStatic(response, url.pathname, publicRoot);
     } catch (error) {

@@ -39,3 +39,18 @@ test("自动推进模式在建书时完成四阶段且书籍更新不能伪造�
   assert.equal(patched.status, 200);
   assert.deepEqual((await patched.json()).book.completedStages, ["world", "characters", "story", "outline"]);
 });
+
+test("作者可以修改生成的资料 Markdown，原始 JSON 保持只读", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "myflow-material-api-"));
+  const server = await startServer({ port: 0, dataRoot: root });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  await fetch(`${base}/api/books`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: "editable-book", title: "资料", premise: "一座城。", genre: "科幻", style: "克制", length: "长篇", chapterWords: "2500" }) });
+  await fetch(`${base}/api/books/editable-book/workflow/world`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const fileUrl = `${base}/api/books/editable-book/files/meta%2Fworld_foundation.md`;
+  const saved = await fetch(fileUrl, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "# 作者改写的世界\n" }) });
+  assert.equal(saved.status, 200);
+  assert.match((await (await fetch(fileUrl)).json()).content, /作者改写的世界/);
+  const readonly = await fetch(`${base}/api/books/editable-book/files/world%2Ffoundation.json`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "{}" }) });
+  assert.equal(readonly.status, 403);
+});

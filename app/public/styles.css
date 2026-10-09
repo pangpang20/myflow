@@ -135,6 +135,9 @@ textarea { min-height: 128px; resize: vertical; }
 .artifact-button:hover { color: var(--ink); background: var(--paper-3); }
 .artifact-button span:first-child { color: var(--gold-deep); }
 .file-viewer { max-height: 440px; overflow: auto; padding: 19px; color: var(--ink-2); background: #fbf8f1; border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 12px; line-height: 1.7; }
+.material-editor { min-height: 330px; color: var(--ink-2); background: #fbf8f1; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 12px; line-height: 1.7; }
+.rewrite-bar { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.rewrite-bar input { flex: 1; min-width: 0; }
 .workbench-grid { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(280px,.9fr); gap: 18px; }
 .workbench-intro { margin-bottom: 22px; }
 .workbench-intro h2 { margin-bottom: 9px; }
