@@ -4,6 +4,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BookStorage, StorageError } from "./storage.mjs";
 import { preparationState, runPreparationStage } from "./generation.mjs";
+import {
+  exportChapters,
+  finalizeChapter,
+  getChapter,
+  listChapterVersions,
+  listChapters,
+  polishChapter,
+  regenerateChapter,
+  restoreChapterVersion,
+  runChapterGeneration,
+  saveChapter,
+} from "./chapters.mjs";
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_ROOT = path.join(APP_ROOT, "public");
@@ -22,6 +34,17 @@ function sendJson(response, status, body) {
     "cache-control": "no-store",
   });
   response.end(payload);
+}
+
+function sendText(response, status, body, contentType, downloadName) {
+  response.writeHead(status, {
+    "content-type": contentType,
+    "cache-control": "no-store",
+    ...(downloadName
+      ? { "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}` }
+      : {}),
+  });
+  response.end(body);
 }
 
 async function readBody(request) {
@@ -97,6 +120,56 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
         }
         if (parts.length === 5 && parts[3] === "workflow" && request.method === "POST") {
           sendJson(response, 200, await runPreparationStage(storage, parts[2], parts[4], await readBody(request)));
+          return;
+        }
+        if (parts.length === 4 && parts[3] === "chapters" && request.method === "GET") {
+          sendJson(response, 200, { chapters: await listChapters(storage, parts[2]) });
+          return;
+        }
+        if (parts.length === 5 && parts[3] === "chapters" && request.method === "GET") {
+          sendJson(response, 200, await getChapter(storage, parts[2], parts[4]));
+          return;
+        }
+        if (parts.length === 5 && parts[3] === "chapters" && request.method === "PUT") {
+          sendJson(response, 200, await saveChapter(storage, parts[2], parts[4], await readBody(request)));
+          return;
+        }
+        if (parts.length === 6 && parts[3] === "chapters" && parts[5] === "versions" && request.method === "GET") {
+          sendJson(response, 200, { versions: await listChapterVersions(storage, parts[2], parts[4]) });
+          return;
+        }
+        if (parts.length === 6 && parts[3] === "chapters" && request.method === "POST") {
+          const body = await readBody(request);
+          const operation = parts[5];
+          if (operation === "generate") {
+            sendJson(response, 200, await runChapterGeneration(storage, parts[2], parts[4], body));
+            return;
+          }
+          if (operation === "regenerate") {
+            sendJson(response, 200, await regenerateChapter(storage, parts[2], parts[4], body));
+            return;
+          }
+          if (operation === "polish") {
+            sendJson(response, 200, await polishChapter(storage, parts[2], parts[4]));
+            return;
+          }
+          if (operation === "restore") {
+            sendJson(response, 200, await restoreChapterVersion(storage, parts[2], parts[4], body.versionId));
+            return;
+          }
+          if (operation === "finalize" || operation === "post-hoc") {
+            sendJson(response, 200, await finalizeChapter(storage, parts[2], parts[4]));
+            return;
+          }
+        }
+        if (parts.length === 4 && parts[3] === "export" && request.method === "GET") {
+          const exported = await exportChapters(storage, parts[2], {
+            format: url.searchParams.get("format") || "md",
+            from: url.searchParams.get("from") || undefined,
+            to: url.searchParams.get("to") || undefined,
+          });
+          const contentType = exported.format === "md" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8";
+          sendText(response, 200, exported.content, contentType, exported.filename);
           return;
         }
         if (parts.length === 4 && parts[3] === "files" && request.method === "GET") {
