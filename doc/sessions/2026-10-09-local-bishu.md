@@ -12,12 +12,14 @@
 - 实现接近线上笔枢视觉方向的本地控制台：书架、建书表单、资料查看和正文工作台。
 - 支持编辑并保存世界观、角色、故事规划和卷纲 Markdown 资料，原始 JSON 资料保持只读。
 - 支持正文选段改写、旧版本恢复，并在正文有未保存变化时先保存且校验选区，避免改写错误内容。
+- 增加模型接入配置页：支持 OpenAI 兼容接口、DeepSeek、Ollama、硅基流动和自定义地址，保存 API Key 时只在接口响应中返回掩码，并提供 `/models` 连接测试。
 - 补充本地使用文档和服务重启后的端到端验收测试。
 
 ## 测试结果
 
-- `npm test`：22 项通过。
+- `npm test`：27 项通过。
 - `node --check app/public/app.js`：通过。
+- `node --check app/model-settings.mjs`：通过。
 - `git diff --check`：通过。
 - `git diff --cached --check`：通过。
 - 浏览器自动化截图：当前 Codex 浏览器权限被用户拒绝，未执行；已用静态入口测试和 HTTP 端到端测试覆盖同一功能边界。
@@ -32,9 +34,10 @@
 - `69f7020` `feat: add Bishu-style local writing console`
 - `084975d` `feat: allow editing generated markdown materials`
 - `4a9d2c9` `feat: add selection rewrite with stale content protection`
+- `6e05b60` `feat: add local model connection settings`
 
 ## 未解决事项
 
 - 当前没有接入真实模型；需要 Python/DeterminFlow 运行环境和可用模型服务配置后，再增加真实生成适配器和模型验收。
 - 未完成线上账号、云同步、多人协作、计费和公网部署，这些不属于个人本地版范围。
-- 浏览器截图验证受当前客户端权限限制，未能执行；本地服务和测试命令均已执行。
+- 浏览器自动化访问本地地址仍受客户端保存的权限策略限制，未能执行截图；模型配置 API 已通过临时兼容 `/models` 服务完成连接测试，本地服务和测试命令均已执行。
