@@ -29,4 +29,9 @@ test("本地控制台静态入口包含书架、阶段和正文工作台", async
   assert.match(source, /\/chapters\//);
   assert.match(source, /downloadExport/);
   assert.match(source, /performChapterAction/);
+  assert.match(source, /data-save-material/);
+  assert.match(source, /data-chapter-action="rewrite"/);
+  assert.match(source, /selectionStart/);
+  assert.match(source, /original, instruction/);
+  assert.match(source, /action !== "save" && dirty/);
 });

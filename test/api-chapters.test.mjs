@@ -81,3 +81,58 @@ test("章节 API 返回明确的路径和格式错误", async (t) => {
   const response = await fetch(`${base}/api/books/missing/chapters/../export?format=pdf`);
   assert.ok([400, 404].includes(response.status));
 });
+
+test("章节 HTTP API 支持选段改写并保留可恢复版本", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "myflow-api-rewrite-"));
+  const server = await startServer({ port: 0, dataRoot: root });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const book = {
+    slug: "api-rewrite",
+    title: "选段改写接口",
+    premise: "一句话也要能重写。",
+    genre: "悬疑",
+    style: "克制",
+    length: "中篇",
+    chapterWords: "2500",
+  };
+  await fetch(`${base}/api/books`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(book),
+  });
+  for (const stage of ["world", "characters", "story", "outline"]) {
+    assert.equal((await post(base, `/api/books/${book.slug}/workflow/${stage}`)).status, 200);
+  }
+  assert.equal((await post(base, `/api/books/${book.slug}/chapters/0001/generate`)).status, 200);
+  const original = "开头。沈砚推开门。结尾。";
+  assert.equal((await fetch(`${base}/api/books/${book.slug}/chapters/0001`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ content: original }),
+  })).status, 200);
+
+  const selected = "沈砚推开门。";
+  const start = original.indexOf(selected);
+  const rewrittenResponse = await post(base, `/api/books/${book.slug}/chapters/0001/rewrite`, {
+    start,
+    end: start + selected.length,
+    original: selected,
+    instruction: "让动作更紧张",
+  });
+  assert.equal(rewrittenResponse.status, 200);
+  const rewritten = await rewrittenResponse.json();
+  assert.equal(rewritten.content, "开头。沈砚推开门，让动作更紧张。结尾。");
+  assert.equal(rewritten.selection.original, selected);
+  assert.ok(rewritten.versionId);
+
+  const staleResponse = await post(base, `/api/books/${book.slug}/chapters/0001/rewrite`, {
+    start, end: start + selected.length, original: selected, instruction: "再次改写",
+  });
+  assert.equal(staleResponse.status, 409);
+  assert.equal((await (await fetch(`${base}/api/books/${book.slug}/chapters/0001`)).json()).content, rewritten.content);
+
+  const restoredResponse = await post(base, `/api/books/${book.slug}/chapters/0001/restore`, { versionId: rewritten.versionId });
+  assert.equal(restoredResponse.status, 200);
+  assert.equal((await restoredResponse.json()).content, original);
+});

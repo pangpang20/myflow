@@ -59,7 +59,7 @@ function renderWorkbench(panel) {
 }
 function renderChapterEditorHtml(detail) {
   const chapter = detail.chapter; const versions = detail.versions || [];
-  return `<div class="surface chapter-editor" style="margin-top:18px"><div class="section-heading"><div><p class="eyebrow">CHAPTER ${chapter.number}</p><h3>${escapeHtml(chapter.title)}</h3></div><span class="muted small">${chapter.status === "finalized" ? "已定稿" : "草稿"} · ${chapter.wordCount} 字</span></div><label for="chapter-title-edit">章节标题</label><input id="chapter-title-edit" value="${escapeAttr(chapter.title)}" /><label for="chapter-content-edit" style="display:block;margin-top:14px">正文</label><textarea id="chapter-content-edit" rows="18">${escapeHtml(detail.content)}</textarea><div class="form-actions" style="justify-content:start;padding-bottom:10px"><button class="primary-button" data-chapter-action="save" data-chapter="${chapter.number}">保存修改</button><button class="secondary-button" data-chapter-action="polish" data-chapter="${chapter.number}">整章润色</button><button class="secondary-button" data-chapter-action="finalize" data-chapter="${chapter.number}">后验定稿</button></div><div class="version-strip"><span class="muted small">历史版本 ${versions.length ? `（${versions.length}）` : ""}</span>${versions.slice(0, 5).map((version) => `<button class="artifact-button" data-restore-version="${version.id}" data-chapter="${chapter.number}"><span>↶</span><span>${escapeHtml(version.source)} · ${formatDateTime(version.createdAt)}</span></button>`).join("") || '<span class="muted small">保存或润色后会留下版本</span>'}</div></div>`;
+  return `<div class="surface chapter-editor" style="margin-top:18px"><div class="section-heading"><div><p class="eyebrow">CHAPTER ${chapter.number}</p><h3>${escapeHtml(chapter.title)}</h3></div><span class="muted small">${chapter.status === "finalized" ? "已定稿" : "草稿"} · ${chapter.wordCount} 字</span></div><label for="chapter-title-edit">章节标题</label><input id="chapter-title-edit" value="${escapeAttr(chapter.title)}" /><label for="chapter-content-edit" style="display:block;margin-top:14px">正文</label><textarea id="chapter-content-edit" rows="18">${escapeHtml(detail.content)}</textarea><div class="rewrite-bar"><input id="rewrite-instruction" placeholder="选中正文后输入改写要求，例如：让动作更紧张" /><button class="secondary-button" data-chapter-action="rewrite" data-chapter="${chapter.number}">改写选段</button></div><div class="form-actions" style="justify-content:start;padding-bottom:10px"><button class="primary-button" data-chapter-action="save" data-chapter="${chapter.number}">保存修改</button><button class="secondary-button" data-chapter-action="polish" data-chapter="${chapter.number}">整章润色</button><button class="secondary-button" data-chapter-action="finalize" data-chapter="${chapter.number}">后验定稿</button></div><div class="version-strip"><span class="muted small">历史版本 ${versions.length ? `（${versions.length}）` : ""}</span>${versions.slice(0, 5).map((version) => `<button class="artifact-button" data-restore-version="${version.id}" data-chapter="${chapter.number}"><span>↶</span><span>${escapeHtml(version.source)} · ${formatDateTime(version.createdAt)}</span></button>`).join("") || '<span class="muted small">保存或润色后会留下版本</span>'}</div></div>`;
 }
 
 async function runStage(stageKey) { const button = document.querySelector(`[data-run-stage="${stageKey}"]`); if (button) { button.disabled = true; button.textContent = "生成中…"; } try { const result = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/workflow/${stageKey}`, { method: "POST", body: JSON.stringify({}) }); showToast(result.summary); await openBook(state.currentBook.slug, "overview"); } catch (error) { showToast(error.message); if (button) { button.disabled = false; button.textContent = "开始 →"; } } }
@@ -67,7 +67,39 @@ async function showFile(relativePath) { try { const result = await request(`/api
 async function saveMaterial(relativePath) { try { await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/files/${encodeURIComponent(relativePath)}`, { method: "PUT", body: JSON.stringify({ content: document.querySelector("#material-editor").value }) }); showToast("资料已保存"); } catch (error) { showToast(error.message); } }
 async function openChapter(number) { try { state.currentChapter = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${number}`); state.currentTab = "workbench"; renderBook(); } catch (error) { showToast(error.message); } }
 async function createChapter() { if (!state.currentBook) return; const intent = document.querySelector("#chapter-intent")?.value || "从一份没有日期的旧记录开始，留下一个与主角笔迹相同的警告。"; const chapter = document.querySelector("#chapter-number")?.value || "1"; const targetWordCount = document.querySelector("#target-words")?.value || state.currentBook.chapterWords; try { const result = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${chapter}/generate`, { method: "POST", body: JSON.stringify({ guidance: intent, targetWordCount }) }); showToast(result.summary || "章节草稿已生成"); state.chapters = (await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters`)).chapters; state.currentChapter = { chapter: result.chapter, content: result.content, versions: [] }; state.currentTab = "workbench"; renderBook(); } catch (error) { showToast(error.message); } }
-async function performChapterAction(action, number) { try { const encodedBook = encodeURIComponent(state.currentBook.slug); let result; if (action === "save") result = await request(`/api/books/${encodedBook}/chapters/${number}`, { method: "PUT", body: JSON.stringify({ title: document.querySelector("#chapter-title-edit").value, content: document.querySelector("#chapter-content-edit").value }) }); else result = await request(`/api/books/${encodedBook}/chapters/${number}/${action}`, { method: "POST", body: "{}" }); showToast(result.summary || (action === "save" ? "修改已保存" : "操作完成")); state.chapters = (await request(`/api/books/${encodedBook}/chapters`)).chapters; state.currentChapter = await request(`/api/books/${encodedBook}/chapters/${number}`); renderBook(); } catch (error) { showToast(error.message); } }
+async function performChapterAction(action, number) {
+  try {
+    const encodedBook = encodeURIComponent(state.currentBook.slug);
+    const title = document.querySelector("#chapter-title-edit").value;
+    const editor = document.querySelector("#chapter-content-edit");
+    const content = editor.value;
+    const saveBody = JSON.stringify({ title, content });
+    let selection;
+    if (action === "rewrite") {
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const original = content.slice(start, end);
+      const instruction = document.querySelector("#rewrite-instruction").value.trim();
+      if (!original.trim()) throw new Error("请先选择需要改写的正文");
+      if (!instruction) throw new Error("请输入改写要求");
+      selection = { start, end, original, instruction };
+    }
+
+    const dirty = content !== state.currentChapter.content || title !== state.currentChapter.chapter.title;
+    if (action !== "save" && dirty) {
+      await request(`/api/books/${encodedBook}/chapters/${number}`, { method: "PUT", body: saveBody });
+    }
+    const result = action === "save"
+      ? await request(`/api/books/${encodedBook}/chapters/${number}`, { method: "PUT", body: saveBody })
+      : await request(`/api/books/${encodedBook}/chapters/${number}/${action}`, {
+        method: "POST", body: JSON.stringify(selection || {}),
+      });
+    showToast(result.summary || (action === "save" ? "修改已保存" : "操作完成"));
+    state.chapters = (await request(`/api/books/${encodedBook}/chapters`)).chapters;
+    state.currentChapter = await request(`/api/books/${encodedBook}/chapters/${number}`);
+    renderBook();
+  } catch (error) { showToast(error.message); }
+}
 async function restoreVersion(number, versionId) { try { const result = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${number}/restore`, { method: "POST", body: JSON.stringify({ versionId }) }); showToast("已恢复历史版本"); state.currentChapter = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${number}`); renderBook(); } catch (error) { showToast(error.message); } }
 async function downloadExport(format) { try { const response = await fetch(`/api/books/${encodeURIComponent(state.currentBook.slug)}/export?format=${format}`); if (!response.ok) throw new Error((await response.json()).error || "导出失败"); const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${state.currentBook.slug}.${format}`; link.click(); URL.revokeObjectURL(link.href); showToast(`已导出 ${format.toUpperCase()} 文件`); } catch (error) { showToast(error.message); } }
 

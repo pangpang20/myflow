@@ -308,6 +308,48 @@ export async function saveChapter(storage, slug, chapterNumber, input = {}) {
   return { chapter: { ...chapter, content: undefined }, content, versionId: version.id };
 }
 
+export async function rewriteSelection(storage, slug, chapterNumber, input = {}) {
+  const current = await requireChapter(storage, slug, chapterNumber);
+  const { start, end } = input;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)
+    || start < 0 || end > current.content.length || start >= end) {
+    throw new ChapterError("选段范围无效", 400);
+  }
+  const original = current.content.slice(start, end);
+  if (!original.trim()) throw new ChapterError("选段不能为空", 400);
+  if (input.original !== undefined && input.original !== original) {
+    throw new ChapterError("正文已变化，请重新选择片段", 409);
+  }
+  const instruction = requiredText(input.instruction, "改写要求", 5_000);
+  const leading = original.match(/^\s*/u)?.[0] || "";
+  const trailing = original.match(/\s*$/u)?.[0] || "";
+  const body = original.trim().replace(/[。！？!?]$/u, "");
+  const direction = instruction.replace(/[。！？!?]$/u, "");
+  const replacement = `${leading}${body}，${direction}。${trailing}`;
+  const content = current.content.slice(0, start) + replacement + current.content.slice(end);
+  if (content.length > MAX_CONTENT_LENGTH) throw new ChapterError("改写后正文过长", 400);
+
+  const version = await createVersion(storage, slug, current, "rewrite-before");
+  const chapter = {
+    ...current,
+    status: "draft",
+    wordCount: wordCount(content),
+    updatedAt: new Date().toISOString(),
+    content,
+    finalizedAt: undefined,
+    postHocPath: undefined,
+  };
+  await clearPostHoc(storage, slug, chapter.number);
+  await writeCurrentChapter(storage, slug, chapter);
+  return {
+    chapter: { ...chapter, content: undefined },
+    content,
+    selection: { start, end: start + replacement.length, original, replacement },
+    versionId: version.id,
+    summary: "选段改写完成。",
+  };
+}
+
 export async function listChapterVersions(storage, slug, chapterNumber) {
   await storage.getBook(slug);
   const { root, number } = chapterDirectory(storage, slug, chapterNumber);

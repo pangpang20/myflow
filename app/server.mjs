@@ -13,6 +13,7 @@ import {
   polishChapter,
   regenerateChapter,
   restoreChapterVersion,
+  rewriteSelection,
   runChapterGeneration,
   saveChapter,
 } from "./chapters.mjs";
@@ -156,6 +157,10 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
           }
           if (operation === "restore") {
             sendJson(response, 200, await restoreChapterVersion(storage, parts[2], parts[4], body.versionId));
+            return;
+          }
+          if (operation === "rewrite") {
+            sendJson(response, 200, await rewriteSelection(storage, parts[2], parts[4], body));
             return;
           }
           if (operation === "finalize" || operation === "post-hoc") {

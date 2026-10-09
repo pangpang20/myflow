@@ -12,6 +12,7 @@ import {
   polishChapter,
   regenerateChapter,
   restoreChapterVersion,
+  rewriteSelection,
   runChapterGeneration,
   saveChapter,
 } from "../app/chapters.mjs";
@@ -100,3 +101,73 @@ test("章节模块拒绝未完成建书流程和非法导出范围", async () =>
   );
 });
 
+test("选段改写只替换选区、保存旧版本并撤销过期后验", async () => {
+  const { root, storage } = await makeReadyBook();
+  await runChapterGeneration(storage, "chapter-book", "0001");
+  const original = "序幕。沈砚发现密信。结尾。";
+  await saveChapter(storage, "chapter-book", "0001", { content: original });
+  await finalizeChapter(storage, "chapter-book", "0001");
+  const selectionText = "沈砚发现密信。";
+  const start = original.indexOf(selectionText);
+  const result = await rewriteSelection(storage, "chapter-book", "0001", {
+    start,
+    end: start + selectionText.length,
+    original: selectionText,
+    instruction: "让动作更紧张",
+  });
+
+  assert.equal(result.content, "序幕。沈砚发现密信，让动作更紧张。结尾。");
+  assert.equal(result.selection.original, selectionText);
+  assert.equal(result.selection.replacement, "沈砚发现密信，让动作更紧张。");
+  assert.equal(result.selection.end, start + result.selection.replacement.length);
+  assert.equal(result.chapter.status, "draft");
+  assert.equal(result.chapter.finalizedAt, undefined);
+  assert.equal(result.chapter.postHocPath, undefined);
+  assert.ok(result.versionId);
+  assert.equal((await listChapterVersions(storage, "chapter-book", "0001"))[0].source, "rewrite-before");
+  await assert.rejects(
+    () => fs.access(path.join(root, "books", "chapter-book", "story", "0001", "post-hoc.json")),
+    (error) => error.code === "ENOENT",
+  );
+  const reloaded = await getChapter(new BookStorage(root), "chapter-book", "0001");
+  assert.equal(reloaded.content, result.content);
+  const restored = await restoreChapterVersion(storage, "chapter-book", "0001", result.versionId);
+  assert.equal(restored.content, original);
+});
+
+test("选段改写拒绝无效偏移、空白选区和缺失指令", async () => {
+  const { storage } = await makeReadyBook();
+  await runChapterGeneration(storage, "chapter-book", "0001");
+  await saveChapter(storage, "chapter-book", "0001", { content: "开端。\n\n结尾。" });
+  const before = await listChapterVersions(storage, "chapter-book", "0001");
+  for (const input of [
+    { start: 0, end: 0, instruction: "加快节奏" },
+    { start: -1, end: 2, instruction: "加快节奏" },
+    { start: 0.5, end: 2, instruction: "加快节奏" },
+    { start: 0, end: 100, instruction: "加快节奏" },
+    { start: 3, end: 5, instruction: "加快节奏" },
+    { start: 0, end: 2, instruction: "" },
+  ]) {
+    await assert.rejects(
+      () => rewriteSelection(storage, "chapter-book", "0001", input),
+      (error) => error.status === 400,
+    );
+  }
+  assert.equal((await listChapterVersions(storage, "chapter-book", "0001")).length, before.length);
+  assert.equal((await getChapter(storage, "chapter-book", "0001")).content, "开端。\n\n结尾。");
+});
+
+test("选段改写拒绝已经变化的正文选区", async () => {
+  const { storage } = await makeReadyBook();
+  await runChapterGeneration(storage, "chapter-book", "0001");
+  await saveChapter(storage, "chapter-book", "0001", { content: "开端。旧线索。结尾。" });
+  const before = await listChapterVersions(storage, "chapter-book", "0001");
+  await assert.rejects(
+    () => rewriteSelection(storage, "chapter-book", "0001", {
+      start: 3, end: 7, original: "新线索。", instruction: "写得更紧张",
+    }),
+    (error) => error.status === 409,
+  );
+  assert.equal((await getChapter(storage, "chapter-book", "0001")).content, "开端。旧线索。结尾。");
+  assert.equal((await listChapterVersions(storage, "chapter-book", "0001")).length, before.length);
+});
