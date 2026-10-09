@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BookStorage, StorageError } from "./storage.mjs";
+import { preparationState, runPreparationStage } from "./generation.mjs";
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_ROOT = path.join(APP_ROOT, "public");
@@ -37,10 +38,10 @@ async function readBody(request) {
   }
 }
 
-async function serveStatic(response, pathname) {
+async function serveStatic(response, pathname, publicRoot = PUBLIC_ROOT) {
   const requested = pathname === "/" ? "/index.html" : pathname;
-  const target = path.resolve(PUBLIC_ROOT, `.${requested}`);
-  if (!target.startsWith(`${PUBLIC_ROOT}${path.sep}`)) {
+  const target = path.resolve(publicRoot, `.${requested}`);
+  if (!target.startsWith(`${publicRoot}${path.sep}`)) {
     sendJson(response, 404, { error: "页面不存在" });
     return;
   }
@@ -89,8 +90,25 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
           sendJson(response, 200, await storage.deleteBook(parts[2]));
           return;
         }
+        if (parts.length === 4 && parts[3] === "workflow" && request.method === "GET") {
+          const book = await storage.getBook(parts[2]);
+          sendJson(response, 200, { mode: "mock", stages: preparationState(book), book });
+          return;
+        }
+        if (parts.length === 5 && parts[3] === "workflow" && request.method === "POST") {
+          sendJson(response, 200, await runPreparationStage(storage, parts[2], parts[4], await readBody(request)));
+          return;
+        }
+        if (parts.length === 4 && parts[3] === "files" && request.method === "GET") {
+          sendJson(response, 200, { files: await storage.listBookFiles(parts[2]) });
+          return;
+        }
+        if (parts.length >= 5 && parts[3] === "files" && request.method === "GET") {
+          sendJson(response, 200, { path: parts.slice(4).join("/"), content: await storage.readBookText(parts[2], parts.slice(4).join("/")) });
+          return;
+        }
       }
-      await serveStatic(response, url.pathname);
+      await serveStatic(response, url.pathname, publicRoot);
     } catch (error) {
       const status = error instanceof StorageError ? error.status : 500;
       if (status >= 500) console.error(error);
@@ -113,4 +131,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const address = server.address();
   console.log(`myflow 本地写作台：http://127.0.0.1:${address.port}`);
 }
-

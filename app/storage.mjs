@@ -161,6 +161,10 @@ export class BookStorage {
   async updateBook(slug, input) {
     const current = await this.getBook(slug);
     const patch = normalizePatch(input);
+    if (Array.isArray(input?.completedStages)) {
+      patch.completedStages = input.completedStages.filter((stage) => typeof stage === "string");
+    }
+    if (typeof input?.stage === "string") patch.stage = input.stage;
     const updated = { ...current, ...patch, updatedAt: new Date().toISOString() };
     await this.writeJson(path.join(this.bookDir(slug), "book.json"), updated);
     return updated;
@@ -172,8 +176,55 @@ export class BookStorage {
     return { slug, deleted: true };
   }
 
+  bookFile(slug, relativePath) {
+    const bookRoot = this.bookDir(slug);
+    if (typeof relativePath !== "string" || relativePath.trim() === "") {
+      throw new StorageError("文件路径不能为空", 400);
+    }
+    const normalized = relativePath.replaceAll("\\", "/");
+    if (normalized.startsWith("/") || normalized.split("/").some((part) => part === ".." || part === "")) {
+      throw new StorageError("非法文件路径", 400);
+    }
+    const target = path.resolve(bookRoot, normalized);
+    if (!target.startsWith(`${bookRoot}${path.sep}`)) {
+      throw new StorageError("非法文件路径", 400);
+    }
+    return { target, relativePath: normalized };
+  }
+
+  async writeBookText(slug, relativePath, value) {
+    const { target } = this.bookFile(slug, relativePath);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, String(value), "utf8");
+    return relativePath.replaceAll("\\", "/");
+  }
+
+  async readBookText(slug, relativePath) {
+    const { target } = this.bookFile(slug, relativePath);
+    try {
+      return await fs.readFile(target, "utf8");
+    } catch (error) {
+      if (error.code === "ENOENT") throw new StorageError("文件不存在", 404);
+      throw error;
+    }
+  }
+
+  async listBookFiles(slug) {
+    const root = this.bookDir(slug);
+    await this.getBook(slug);
+    const files = [];
+    async function visit(current, prefix = "") {
+      for (const entry of await fs.readdir(current, { withFileTypes: true })) {
+        const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) await visit(path.join(current, entry.name), relative);
+        else files.push(relative);
+      }
+    }
+    await visit(root);
+    return files.sort();
+  }
+
   async writeJson(filePath, value) {
     await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   }
 }
-
