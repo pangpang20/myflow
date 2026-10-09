@@ -16,11 +16,12 @@
 - 定稿：模拟后验结算、连续性状态、下一章入口。
 - 导出：Markdown、TXT；浏览器直接下载。
 - 本地文件存档和端到端测试。
+- 模型接入配置：OpenAI 兼容接口、DeepSeek、Ollama 和硅基流动预设，支持本地保存、密钥脱敏和连接测试。
 
 ### 第一版不包含
 
 - 账号、云同步、多人协作、计费和公网部署。
-- 真实模型调用。模拟生成用于开发和无密钥验收。
+- 真实模型生成调用。当前先完成配置和连接验证，模拟生成仍用于无密钥验收。
 - 逐像素复制线上登录页或无法公开检查的登录后实现。
 
 ## 技术方案
@@ -53,4 +54,3 @@
 ## 真实 DeterminFlow 接入预留
 
 公开 `bishu-novel` 插件的工作流 ID 默认映射为 `bishu-novel-build`、`bishu-novel-character`、`bishu-novel-story-plan`、`bishu-novel-outline`、`bishu-novel-mvp`、`bishu-novel-polish` 和 `bishu-novel-post-hoc`。后续适配器将通过任务创建接口传入固定的 `workspace_override`，但不把 Core task ID 当作书籍身份。
-

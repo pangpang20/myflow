@@ -1,4 +1,4 @@
-const state = { books: [], currentBook: null, currentTab: "overview", workflow: null, files: [], chapters: [], currentChapter: null, query: "" };
+const state = { books: [], currentBook: null, currentTab: "overview", workflow: null, files: [], chapters: [], currentChapter: null, query: "", modelSettings: null, modelProviders: [] };
 const app = document.querySelector("#app");
 const breadcrumb = document.querySelector("#breadcrumb");
 const toast = document.querySelector("#toast");
@@ -19,6 +19,8 @@ function escapeHtml(value) { return String(value ?? "").replace(/[&<>'"]/g, (cha
 function escapeAttr(value) { return escapeHtml(value).replace(/`/g, "&#96;"); }
 
 async function loadBooks() { state.books = (await request("/api/books")).books; document.querySelector("#book-count").textContent = state.books.length; renderSideBooks(); }
+async function loadModelSettings() { const result = await request("/api/settings/model"); state.modelSettings = result.settings; state.modelProviders = result.providers || []; renderModelStatus(); }
+function renderModelStatus() { const label = document.querySelector("#model-mode-label"); const detail = document.querySelector("#model-mode-detail"); if (!label || !detail) return; if (state.modelSettings?.apiKeyConfigured) { label.textContent = "模型配置已保存"; detail.textContent = `${state.modelSettings.providerLabel} · ${state.modelSettings.model}`; } else { label.textContent = "本地模拟模式"; detail.textContent = "可在右上角配置模型接口"; } }
 function renderSideBooks() { const target = document.querySelector("#side-book-links"); if (!target) return; target.innerHTML = state.books.length ? state.books.map((book) => `<button class="side-book-link ${state.currentBook?.slug === book.slug ? "current" : ""}" data-open-book="${escapeAttr(book.slug)}">${escapeHtml(book.title)}</button>`).join("") : '<p class="muted small">还没有作品</p>'; }
 
 function renderShelf() {
@@ -31,6 +33,60 @@ function renderShelf() {
 function renderCreate() {
   breadcrumb.innerHTML = '<button class="back-link" data-action="shelf">书架</button><span> / 新建作品</span>'; app.replaceChildren(template("create-template"));
   document.querySelector("#create-form").addEventListener("submit", async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const data = Object.fromEntries(form.entries()); try { const result = await request("/api/books", { method: "POST", body: JSON.stringify(data) }); await loadBooks(); showToast("作品已建立，开始铸造世界"); await openBook(result.book.slug); } catch (error) { showToast(error.message); } });
+}
+
+function modelFormPayload() {
+  const form = document.querySelector("#model-settings-form");
+  const data = new FormData(form);
+  const payload = {
+    provider: data.get("provider"),
+    baseUrl: data.get("baseUrl"),
+    model: data.get("model"),
+    temperature: Number(data.get("temperature")),
+    maxTokens: Number(data.get("maxTokens")),
+  };
+  const apiKey = String(data.get("apiKey") || "");
+  if (apiKey) payload.apiKey = apiKey;
+  if (document.querySelector("#model-clear-key").checked) payload.clearApiKey = true;
+  return payload;
+}
+
+function renderSettings() {
+  state.currentBook = null;
+  state.currentChapter = null;
+  breadcrumb.innerHTML = '<button class="back-link" data-action="shelf">书架</button><span> / 模型配置</span>';
+  app.replaceChildren(template("settings-template"));
+  const settings = state.modelSettings || {};
+  const provider = document.querySelector("#model-provider");
+  const baseUrl = document.querySelector("#model-base-url");
+  provider.value = settings.provider || "openai-compatible";
+  baseUrl.value = settings.baseUrl || "";
+  document.querySelector("#model-name").value = settings.model || "";
+  document.querySelector("#model-temperature").value = settings.temperature ?? 0.7;
+  document.querySelector("#model-max-tokens").value = settings.maxTokens ?? 4096;
+  document.querySelector("#model-key-status").textContent = settings.apiKeyConfigured ? `当前密钥：${settings.apiKeyPreview}（输入新值可替换）` : "当前没有保存密钥。";
+  provider.addEventListener("change", () => { const preset = state.modelProviders.find((item) => item.key === provider.value); if (preset?.baseUrl) baseUrl.value = preset.baseUrl; });
+  document.querySelector("#model-settings-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const result = await request("/api/settings/model", { method: "PUT", body: JSON.stringify(modelFormPayload()) });
+      state.modelSettings = result.settings;
+      renderModelStatus();
+      document.querySelector("#model-settings-result").textContent = "模型配置已保存。";
+      document.querySelector("#model-key-status").textContent = result.settings.apiKeyConfigured ? `当前密钥：${result.settings.apiKeyPreview}（输入新值可替换）` : "当前没有保存密钥。";
+      showToast("模型配置已保存");
+    } catch (error) { document.querySelector("#model-settings-result").textContent = error.message; showToast(error.message); }
+  });
+  document.querySelector("#test-model-connection").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    document.querySelector("#model-settings-result").textContent = "正在测试连接…";
+    try {
+      const result = await request("/api/settings/model/test", { method: "POST", body: JSON.stringify(modelFormPayload()) });
+      document.querySelector("#model-settings-result").textContent = `${result.summary}${result.modelAvailable ? "模型可用。" : "接口可用，但模型列表中未找到该模型。"}`;
+    } catch (error) { document.querySelector("#model-settings-result").textContent = error.message; }
+    finally { button.disabled = false; }
+  });
 }
 
 async function loadBookContext(slug) {
@@ -103,7 +159,7 @@ async function performChapterAction(action, number) {
 async function restoreVersion(number, versionId) { try { const result = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${number}/restore`, { method: "POST", body: JSON.stringify({ versionId }) }); showToast("已恢复历史版本"); state.currentChapter = await request(`/api/books/${encodeURIComponent(state.currentBook.slug)}/chapters/${number}`); renderBook(); } catch (error) { showToast(error.message); } }
 async function downloadExport(format) { try { const response = await fetch(`/api/books/${encodeURIComponent(state.currentBook.slug)}/export?format=${format}`); if (!response.ok) throw new Error((await response.json()).error || "导出失败"); const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${state.currentBook.slug}.${format}`; link.click(); URL.revokeObjectURL(link.href); showToast(`已导出 ${format.toUpperCase()} 文件`); } catch (error) { showToast(error.message); } }
 
-document.addEventListener("click", async (event) => { const actionTarget = event.target.closest("[data-action]"); const exportTarget = event.target.closest("[data-export-format]"); const saveMaterialTarget = event.target.closest("[data-save-material]"); const openTarget = event.target.closest("[data-open-book]"); const stageTarget = event.target.closest("[data-run-stage]"); const fileTarget = event.target.closest("[data-file]"); const chapterTarget = event.target.closest("[data-open-chapter]"); const chapterActionTarget = event.target.closest("[data-chapter-action]"); const restoreTarget = event.target.closest("[data-restore-version]"); if (actionTarget) { const action = actionTarget.dataset.action; if (action === "shelf") { state.query = ""; renderShelf(); return; } if (action === "new-book") { renderCreate(); return; } if (action === "open-workbench") { state.currentTab = "workbench"; renderBook(); return; } if (action === "run-next") { const next = state.workflow.stages.find((stage) => stage.status === "ready"); if (next) runStage(next.key); return; } if (action === "generate-chapter") { createChapter(); return; } if (action === "toggle-theme") { document.documentElement.classList.toggle("dark"); return; } } if (exportTarget) { await downloadExport(exportTarget.dataset.exportFormat); return; } if (saveMaterialTarget) { await saveMaterial(saveMaterialTarget.dataset.saveMaterial); return; } if (openTarget) { await openBook(openTarget.dataset.openBook); return; } if (stageTarget) { await runStage(stageTarget.dataset.runStage); return; } if (fileTarget) { await showFile(fileTarget.dataset.file); return; } if (chapterTarget) { await openChapter(chapterTarget.dataset.openChapter); return; } if (chapterActionTarget) { await performChapterAction(chapterActionTarget.dataset.chapterAction, chapterActionTarget.dataset.chapter); return; } if (restoreTarget) await restoreVersion(restoreTarget.dataset.chapter, restoreTarget.dataset.restoreVersion); });
+document.addEventListener("click", async (event) => { const actionTarget = event.target.closest("[data-action]"); const exportTarget = event.target.closest("[data-export-format]"); const saveMaterialTarget = event.target.closest("[data-save-material]"); const openTarget = event.target.closest("[data-open-book]"); const stageTarget = event.target.closest("[data-run-stage]"); const fileTarget = event.target.closest("[data-file]"); const chapterTarget = event.target.closest("[data-open-chapter]"); const chapterActionTarget = event.target.closest("[data-chapter-action]"); const restoreTarget = event.target.closest("[data-restore-version]"); if (actionTarget) { const action = actionTarget.dataset.action; if (action === "shelf") { state.query = ""; renderShelf(); return; } if (action === "new-book") { renderCreate(); return; } if (action === "model-settings") { renderSettings(); return; } if (action === "open-workbench") { state.currentTab = "workbench"; renderBook(); return; } if (action === "run-next") { const next = state.workflow.stages.find((stage) => stage.status === "ready"); if (next) runStage(next.key); return; } if (action === "generate-chapter") { createChapter(); return; } if (action === "toggle-theme") { document.documentElement.classList.toggle("dark"); return; } } if (exportTarget) { await downloadExport(exportTarget.dataset.exportFormat); return; } if (saveMaterialTarget) { await saveMaterial(saveMaterialTarget.dataset.saveMaterial); return; } if (openTarget) { await openBook(openTarget.dataset.openBook); return; } if (stageTarget) { await runStage(stageTarget.dataset.runStage); return; } if (fileTarget) { await showFile(fileTarget.dataset.file); return; } if (chapterTarget) { await openChapter(chapterTarget.dataset.openChapter); return; } if (chapterActionTarget) { await performChapterAction(chapterActionTarget.dataset.chapterAction, chapterActionTarget.dataset.chapter); return; } if (restoreTarget) await restoreVersion(restoreTarget.dataset.chapter, restoreTarget.dataset.restoreVersion); });
 
-async function boot() { try { await loadBooks(); renderShelf(); } catch (error) { app.innerHTML = `<div class="empty-state"><h3>本地服务没有响应</h3><p>${escapeHtml(error.message)}</p><button class="secondary-button" onclick="location.reload()">重新连接</button></div>`; } }
+async function boot() { try { await Promise.all([loadBooks(), loadModelSettings()]); renderShelf(); } catch (error) { app.innerHTML = `<div class="empty-state"><h3>本地服务没有响应</h3><p>${escapeHtml(error.message)}</p><button class="secondary-button" onclick="location.reload()">重新连接</button></div>`; } }
 boot();

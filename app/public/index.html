@@ -21,10 +21,10 @@
           <div class="nav-label">当前作品</div>
           <div id="side-book-links" class="side-book-links"><p class="muted small">还没有作品</p></div>
         </nav>
-        <div class="sidebar-foot"><div class="mode-note"><span class="status-dot"></span><span>本地模拟模式</span></div><p>作品只保存在这台电脑上</p></div>
+        <div class="sidebar-foot"><div class="mode-note"><span class="status-dot"></span><span id="model-mode-label">本地模拟模式</span></div><p id="model-mode-detail">作品只保存在这台电脑上</p></div>
       </aside>
       <section class="content-shell">
-        <header class="topbar"><div class="breadcrumb" id="breadcrumb"><span>书架</span></div><div class="topbar-actions"><button class="icon-button" data-action="toggle-theme" title="切换显示主题" aria-label="切换显示主题">◐</button><button class="avatar" title="本地作者">作</button></div></header>
+        <header class="topbar"><div class="breadcrumb" id="breadcrumb"><span>书架</span></div><div class="topbar-actions"><button class="icon-button" data-action="model-settings" title="模型接入配置" aria-label="模型接入配置">⚙</button><button class="icon-button" data-action="toggle-theme" title="切换显示主题" aria-label="切换显示主题">◐</button><button class="avatar" title="本地作者">作</button></div></header>
         <main id="app" class="main-content"><div class="loading-state"><span class="spinner"></span> 正在打开本地书架</div></main>
       </section>
     </div>
@@ -55,6 +55,20 @@
     <template id="book-template">
       <section class="view book-view"><div class="book-hero"><div><p class="eyebrow" id="book-genre-label">NOVEL PROJECT</p><h1 id="book-title-label"></h1><p id="book-premise-label" class="book-premise"></p></div><div class="book-hero-actions"><button class="secondary-button" data-export-format="md">导出 Markdown</button><button class="secondary-button" data-export-format="txt">导出 TXT</button><button class="primary-button" data-action="open-workbench">进入工作台 <span aria-hidden="true">→</span></button></div></div>
         <div class="book-tabs" role="tablist"><button class="book-tab active" data-tab="overview" role="tab">总览</button><button class="book-tab" data-tab="world" role="tab">世界</button><button class="book-tab" data-tab="characters" role="tab">角色表</button><button class="book-tab" data-tab="story" role="tab">故事规划</button><button class="book-tab" data-tab="outline" role="tab">卷大纲</button><button class="book-tab" data-tab="workbench" role="tab">工作台</button></div><div id="book-panel" class="book-panel"></div>
+      </section>
+    </template>
+
+    <template id="settings-template">
+      <section class="view settings-view">
+        <div class="settings-intro"><p class="eyebrow">MODEL CONNECTION</p><h1>接入你的模型。</h1><p>填写 OpenAI 兼容接口的地址、模型和密钥。配置保存在本机，密钥不会回显到页面以外的 API 响应中。</p></div>
+        <form id="model-settings-form" class="settings-form">
+          <div class="settings-section"><div><p class="eyebrow">PROVIDER</p><h3>服务商与接口</h3></div><div class="settings-fields"><label for="model-provider">服务商</label><select id="model-provider" name="provider"><option value="openai-compatible">OpenAI 兼容接口</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama 本地</option><option value="siliconflow">硅基流动</option><option value="custom">自定义兼容接口</option></select><label for="model-base-url">接口地址</label><input id="model-base-url" name="baseUrl" type="url" required placeholder="https://api.openai.com/v1" /><p class="field-hint">填写到版本根路径，例如 `/v1`，不要填 `/chat/completions`。</p></div></div>
+          <div class="settings-section"><div><p class="eyebrow">MODEL</p><h3>模型参数</h3></div><div class="settings-fields"><label for="model-name">模型名称</label><input id="model-name" name="model" required placeholder="例如：gpt-4o-mini、deepseek-chat、qwen-plus" /><div class="split-fields"><div><label for="model-temperature">温度</label><input id="model-temperature" name="temperature" type="number" min="0" max="2" step="0.1" /></div><div><label for="model-max-tokens">最大输出</label><input id="model-max-tokens" name="maxTokens" type="number" min="256" max="32768" step="1" /></div></div></div></div>
+          <div class="settings-section"><div><p class="eyebrow">CREDENTIAL</p><h3>访问密钥</h3></div><div class="settings-fields"><label for="model-api-key">API Key</label><input id="model-api-key" name="apiKey" type="password" autocomplete="off" placeholder="留空表示保留当前密钥" /><p id="model-key-status" class="field-hint"></p><label class="check-row"><input id="model-clear-key" name="clearApiKey" type="checkbox" /><span>清除本地保存的密钥</span></label></div></div>
+          <div class="settings-note"><strong>当前生成模式</strong><p>本版本的创作流程仍使用本地模拟生成器。保存配置后可以先测试接口连通性，确认无误后再切换真实生成适配器。</p></div>
+          <div class="form-actions settings-actions"><button type="button" id="test-model-connection" class="secondary-button">测试连接</button><button type="submit" class="primary-button">保存模型配置</button></div>
+          <p id="model-settings-result" class="settings-result" role="status" aria-live="polite"></p>
+        </form>
       </section>
     </template>
   </body>

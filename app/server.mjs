@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BookStorage, StorageError } from "./storage.mjs";
+import { MODEL_PROVIDERS, normalizeModelSettings, publicModelSettings, testModelConnection } from "./model-settings.mjs";
 import { preparationState, runPreparationSequence, runPreparationStage } from "./generation.mjs";
 import {
   exportChapters,
@@ -91,6 +92,25 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
       if (parts[0] === "api" && parts[1] === "health" && request.method === "GET") {
         sendJson(response, 200, { ok: true, app: "myflow", mode: "mock" });
         return;
+      }
+      if (parts[0] === "api" && parts[1] === "settings" && parts[2] === "model") {
+        if (parts.length === 3 && request.method === "GET") {
+          sendJson(response, 200, {
+            settings: publicModelSettings(await storage.getModelSettings()),
+            providers: MODEL_PROVIDERS.map(({ key, label, baseUrl }) => ({ key, label, baseUrl })),
+          });
+          return;
+        }
+        if (parts.length === 3 && request.method === "PUT") {
+          sendJson(response, 200, { settings: publicModelSettings(await storage.updateModelSettings(await readBody(request))) });
+          return;
+        }
+        if (parts.length === 4 && parts[3] === "test" && request.method === "POST") {
+          const current = await storage.getModelSettings();
+          const settings = normalizeModelSettings(await readBody(request), current);
+          sendJson(response, 200, await testModelConnection(settings));
+          return;
+        }
       }
       if (parts[0] === "api" && parts[1] === "books") {
         if (parts.length === 2 && request.method === "GET") {
@@ -205,7 +225,7 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
       }
       await serveStatic(response, url.pathname, publicRoot);
     } catch (error) {
-      const status = error instanceof StorageError ? error.status : 500;
+      const status = error instanceof StorageError || Number.isInteger(error?.status) ? error.status : 500;
       if (status >= 500) console.error(error);
       sendJson(response, status, { error: error.message || "服务器错误" });
     }

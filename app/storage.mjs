@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_MODEL_SETTINGS, normalizeModelSettings } from "./model-settings.mjs";
 
 const BOOK_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 const BOOK_FIELDS = [
@@ -89,10 +90,36 @@ export class BookStorage {
   constructor(dataRoot = path.join(process.cwd(), "data")) {
     this.dataRoot = path.resolve(dataRoot);
     this.booksRoot = path.join(this.dataRoot, "books");
+    this.configRoot = path.join(this.dataRoot, "config");
   }
 
   async init() {
     await fs.mkdir(this.booksRoot, { recursive: true });
+  }
+
+  async getModelSettings() {
+    await this.init();
+    const filePath = path.join(this.configRoot, "model.json");
+    try {
+      const stored = JSON.parse(await fs.readFile(filePath, "utf8"));
+      const normalized = normalizeModelSettings(stored, DEFAULT_MODEL_SETTINGS);
+      return { ...normalized, updatedAt: typeof stored.updatedAt === "string" ? stored.updatedAt : null };
+    } catch (error) {
+      if (error.code === "ENOENT") return { ...DEFAULT_MODEL_SETTINGS };
+      if (error instanceof SyntaxError) throw new StorageError("模型配置损坏", 500);
+      throw error;
+    }
+  }
+
+  async updateModelSettings(input) {
+    const current = await this.getModelSettings();
+    const settings = {
+      ...normalizeModelSettings(input, current),
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.mkdir(this.configRoot, { recursive: true });
+    await this.writeJson(path.join(this.configRoot, "model.json"), settings);
+    return settings;
   }
 
   bookDir(slug) {

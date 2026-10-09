@@ -84,6 +84,23 @@ h3 { font-size: 18px; }
 .create-view { max-width: 880px; margin: 0 auto; }
 .create-intro { margin: 38px 0 48px; }
 .create-intro h1 { margin-bottom: 16px; }
+.settings-view { max-width: 900px; margin: 0 auto; }
+.settings-intro { margin: 38px 0 42px; }
+.settings-intro h1 { margin-bottom: 16px; }
+.settings-intro p:last-child { max-width: 620px; color: var(--ink-2); font-size: 15px; }
+.settings-form { border-top: 1px solid var(--line); }
+.settings-section { display: grid; grid-template-columns: 180px 1fr; gap: 34px; padding: 30px 0; border-bottom: 1px solid var(--line-soft); }
+.settings-section h3 { margin-bottom: 0; }
+.settings-fields { min-width: 0; }
+.settings-fields > label { display: block; margin: 0 0 9px; font-weight: 600; }
+.settings-fields > input, .settings-fields > select { margin-bottom: 10px; }
+.check-row { display: flex !important; align-items: center; gap: 8px; margin-top: 16px !important; color: var(--ink-2); font-weight: 400 !important; }
+.check-row input { width: auto; }
+.settings-note { margin-top: 24px; padding: 16px 18px; color: var(--ink-2); background: var(--gold-wash); border: 1px solid var(--gold-soft); border-radius: 8px; }
+.settings-note strong { color: var(--ink); }
+.settings-note p { margin: 5px 0 0; font-size: 13px; }
+.settings-actions { justify-content: start; }
+.settings-result { min-height: 24px; margin: -15px 0 0; color: var(--gold-deep); font-size: 13px; }
 .create-form { padding: 26px 0 0; border-top: 1px solid var(--line); }
 .form-section { display: grid; grid-template-columns: 62px 1fr; gap: 22px; padding: 29px 0; border-bottom: 1px solid var(--line-soft); }
 .form-step { color: var(--gold-deep); font-family: Georgia,serif; font-size: 13px; }
@@ -156,4 +173,4 @@ textarea { min-height: 128px; resize: vertical; }
 .version-strip .artifact-button small { margin-left: auto; }
 .dark { --paper: #17130e; --paper-2: #1f1a13; --paper-3: #2a2318; --card: #211b14; --ink: #f4ede0; --ink-2: #bcb2a1; --ink-3: #897f6f; --line: rgba(244,237,224,.13); --line-soft: rgba(244,237,224,.06); --gold: #d8a94f; --gold-deep: #e2b866; --gold-soft: #584a2b; --gold-wash: #2a2417; --shadow: rgba(0,0,0,.45); }
 @media (max-width: 900px) { .sidebar { width: 205px; flex-basis: 205px; } .book-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .overview-grid,.workbench-grid { grid-template-columns: 1fr; } }
-@media (max-width: 680px) { .app-shell { display: block; } .sidebar { width: 100%; height: auto; padding: 14px 16px; border-right: 0; border-bottom: 1px solid var(--line); } .brand-lockup { margin: 0 2px 13px; } .new-book-button { width: auto; position: absolute; top: 14px; right: 16px; } .side-nav,.sidebar-foot { display: none; } .topbar { height: 53px; padding: 0 16px; } .main-content { padding: 0 16px 50px; } .view { padding-top: 34px; } .shelf-intro,.book-hero { display: block; } .shelf-intro .primary-button,.book-hero-actions { margin-top: 23px; } h1 { font-size: 38px; } .section-heading { display: block; } .search-box { width: 100%; margin-top: 17px; } .book-grid { grid-template-columns: 1fr; } .form-section { grid-template-columns: 33px 1fr; gap: 12px; } .split-fields,.segmented { grid-template-columns: 1fr; } .book-tabs { margin-inline: -16px; padding-inline: 10px; } }
+@media (max-width: 680px) { .app-shell { display: block; } .sidebar { width: 100%; height: auto; padding: 14px 16px; border-right: 0; border-bottom: 1px solid var(--line); } .brand-lockup { margin: 0 2px 13px; } .new-book-button { width: auto; position: absolute; top: 14px; right: 16px; } .side-nav,.sidebar-foot { display: none; } .topbar { height: 53px; padding: 0 16px; } .main-content { padding: 0 16px 50px; } .view { padding-top: 34px; } .shelf-intro,.book-hero { display: block; } .shelf-intro .primary-button,.book-hero-actions { margin-top: 23px; } h1 { font-size: 38px; } .section-heading { display: block; } .search-box { width: 100%; margin-top: 17px; } .book-grid { grid-template-columns: 1fr; } .form-section,.settings-section { grid-template-columns: 1fr; gap: 12px; } .split-fields,.segmented { grid-template-columns: 1fr; } .book-tabs { margin-inline: -16px; padding-inline: 10px; } }
