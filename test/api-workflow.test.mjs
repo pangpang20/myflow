@@ -26,3 +26,16 @@ test("建书工作流 API 返回阶段状态和生成文件", async (t) => {
   assert.match((await file.json()).content, /世界观基础/);
 });
 
+test("自动推进模式在建书时完成四阶段且书籍更新不能伪造进度", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "myflow-auto-api-"));
+  const server = await startServer({ port: 0, dataRoot: root });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const input = { slug: "auto-book", title: "自动之书", premise: "让世界自动建立。", genre: "奇幻", style: "轻盈", length: "长篇", chapterWords: "2500", mode: "auto" };
+  const created = await fetch(`${base}/api/books`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  assert.equal(created.status, 201);
+  assert.deepEqual((await created.json()).book.completedStages, ["world", "characters", "story", "outline"]);
+  const patched = await fetch(`${base}/api/books/auto-book`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ completedStages: [], title: "自动之书 2" }) });
+  assert.equal(patched.status, 200);
+  assert.deepEqual((await patched.json()).book.completedStages, ["world", "characters", "story", "outline"]);
+});

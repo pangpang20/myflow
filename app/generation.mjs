@@ -113,10 +113,7 @@ export async function runPreparationStage(storage, slug, stageKey, input = {}, e
     artifacts.push(await storage.writeBookText(slug, relativePath, `${content}\n`));
   }
   completed.add(stage.key);
-  const updated = await storage.updateBook(slug, {
-    stage: stage.key,
-    completedStages: [...completed],
-  });
+  const updated = await storage.setBookProgress(slug, stage.key, [...completed]);
   return {
     run: {
       id: `mock-${Date.now().toString(36)}`,
@@ -133,6 +130,16 @@ export async function runPreparationStage(storage, slug, stageKey, input = {}, e
   };
 }
 
+export async function runPreparationSequence(storage, slug, engine = new MockGenerationEngine()) {
+  const results = [];
+  for (const stage of PREPARATION_STAGES) {
+    const book = await storage.getBook(slug);
+    if ((book.completedStages || []).includes(stage.key)) continue;
+    results.push(await runPreparationStage(storage, slug, stage.key, {}, engine));
+  }
+  return { book: await storage.getBook(slug), runs: results.map((result) => result.run) };
+}
+
 export function preparationState(book) {
   const completed = new Set(book.completedStages || []);
   return PREPARATION_STAGES.map((stage) => ({
@@ -140,4 +147,3 @@ export function preparationState(book) {
     status: completed.has(stage.key) ? "completed" : stage.prerequisite && !completed.has(stage.prerequisite) ? "locked" : "ready",
   }));
 }
-

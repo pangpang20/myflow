@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { BookStorage } from "../app/storage.mjs";
-import { preparationState, runPreparationStage } from "../app/generation.mjs";
+import { preparationState, runPreparationSequence, runPreparationStage } from "../app/generation.mjs";
 
 async function makeBook() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "myflow-workflow-"));
@@ -34,3 +34,11 @@ test("阶段文件读取拒绝越界路径", async () => {
   await assert.rejects(() => storage.readBookText("workflow-book", "../book.json"), (error) => error.status === 400);
 });
 
+test("自动推进完成所有前置阶段且重复运行不会覆盖成果", async () => {
+  const storage = await makeBook();
+  const first = await runPreparationSequence(storage, "workflow-book");
+  assert.equal(first.runs.length, 4);
+  assert.deepEqual(first.book.completedStages, ["world", "characters", "story", "outline"]);
+  const second = await runPreparationSequence(storage, "workflow-book");
+  assert.equal(second.runs.length, 0);
+});

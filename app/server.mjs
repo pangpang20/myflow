@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BookStorage, StorageError } from "./storage.mjs";
-import { preparationState, runPreparationStage } from "./generation.mjs";
+import { preparationState, runPreparationSequence, runPreparationStage } from "./generation.mjs";
 import {
   exportChapters,
   finalizeChapter,
@@ -97,7 +97,8 @@ export function createServer({ dataRoot, publicRoot = PUBLIC_ROOT } = {}) {
           return;
         }
         if (parts.length === 2 && request.method === "POST") {
-          const book = await storage.createBook(await readBody(request));
+          let book = await storage.createBook(await readBody(request));
+          if (book.mode === "auto") ({ book } = await runPreparationSequence(storage, book.slug));
           sendJson(response, 201, { book });
           return;
         }

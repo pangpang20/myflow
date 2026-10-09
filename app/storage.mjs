@@ -161,11 +161,14 @@ export class BookStorage {
   async updateBook(slug, input) {
     const current = await this.getBook(slug);
     const patch = normalizePatch(input);
-    if (Array.isArray(input?.completedStages)) {
-      patch.completedStages = input.completedStages.filter((stage) => typeof stage === "string");
-    }
-    if (typeof input?.stage === "string") patch.stage = input.stage;
     const updated = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    await this.writeJson(path.join(this.bookDir(slug), "book.json"), updated);
+    return updated;
+  }
+
+  async setBookProgress(slug, stage, completedStages) {
+    const current = await this.getBook(slug);
+    const updated = { ...current, stage, completedStages, updatedAt: new Date().toISOString() };
     await this.writeJson(path.join(this.bookDir(slug), "book.json"), updated);
     return updated;
   }
