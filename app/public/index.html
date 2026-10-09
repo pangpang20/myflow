@@ -3,15 +3,60 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fefcf8" />
     <title>笔枢 · 本地写作台</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <p class="eyebrow">NOVELBUILT · LOCAL</p>
-      <h1>让一个世界自洽地生长。</h1>
-      <p>本地写作台正在初始化，书架和创作流程即将可用。</p>
-      <a class="button" href="/api/health">检查本地服务</a>
-    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="作品导航">
+        <div class="brand-lockup">
+          <div class="brand-mark">枢</div>
+          <div><strong>笔枢</strong><span>LOCAL NOVELBUILT</span></div>
+        </div>
+        <button class="new-book-button" data-action="new-book"><span aria-hidden="true">＋</span> 新建作品</button>
+        <nav class="side-nav">
+          <button class="nav-item active" data-action="shelf"><span class="nav-icon">⌂</span> 书架 <span class="nav-count" id="book-count">0</span></button>
+          <div class="nav-label">当前作品</div>
+          <div id="side-book-links" class="side-book-links"><p class="muted small">还没有作品</p></div>
+        </nav>
+        <div class="sidebar-foot"><div class="mode-note"><span class="status-dot"></span><span>本地模拟模式</span></div><p>作品只保存在这台电脑上</p></div>
+      </aside>
+      <section class="content-shell">
+        <header class="topbar"><div class="breadcrumb" id="breadcrumb"><span>书架</span></div><div class="topbar-actions"><button class="icon-button" data-action="toggle-theme" title="切换显示主题" aria-label="切换显示主题">◐</button><button class="avatar" title="本地作者">作</button></div></header>
+        <main id="app" class="main-content"><div class="loading-state"><span class="spinner"></span> 正在打开本地书架</div></main>
+      </section>
+    </div>
+
+    <template id="shelf-template">
+      <section class="view shelf-view">
+        <div class="page-intro shelf-intro"><div><p class="eyebrow">YOUR STORIES · YOUR WORLD</p><h1>让世界自洽地生长，<em>你始终执笔。</em></h1><p class="intro-copy">从一个念头开始，逐步建立世界、角色与故事。所有资料留在本地，写作随时可以继续。</p></div><button class="primary-button large" data-action="new-book"><span aria-hidden="true">＋</span> 新建作品</button></div>
+        <div class="rule-line"></div>
+        <div class="section-heading"><div><p class="eyebrow">BOOKSHELF</p><h2>我的作品</h2></div><label class="search-box"><span aria-hidden="true">⌕</span><input id="book-search" type="search" placeholder="搜索作品" autocomplete="off" /></label></div>
+        <div id="book-grid" class="book-grid"></div>
+        <div id="empty-books" class="empty-state" hidden><div class="empty-glyph">○</div><h3>还没有第一本书</h3><p>把脑海里的世界安放下来，先从一个立意开始。</p><button class="secondary-button" data-action="new-book">开始新建</button></div>
+      </section>
+    </template>
+
+    <template id="create-template">
+      <section class="view create-view"><button class="back-link" data-action="shelf">‹ 返回书架</button><div class="create-intro"><p class="eyebrow">CREATE A NEW WORLD</p><h1>先让故事拥有一块土地。</h1><p>好的正文从清晰的意图开始。先写下你想讲的故事，剩下的世界会一层层长出来。</p></div>
+        <form id="create-form" class="create-form">
+          <div class="form-section"><div class="form-step">01</div><div class="form-fields"><label for="book-title">作品名称</label><input id="book-title" name="title" required maxlength="120" placeholder="例如：潮雾中的空白" /><p class="field-hint">这是书架上显示的名称。</p></div></div>
+          <div class="form-section"><div class="form-step">02</div><div class="form-fields"><label for="book-premise">立意与故事种子</label><textarea id="book-premise" name="premise" required rows="5" maxlength="50000" placeholder="你想写一个怎样的故事？它最想留下什么？"></textarea><p class="field-hint">不用完整，先留下一个足够诚实的念头。</p></div></div>
+          <div class="form-section"><div class="form-step">03</div><div class="form-fields split-fields"><div><label for="book-genre">题材</label><input id="book-genre" name="genre" required placeholder="科幻 / 悬疑 / 言情" /></div><div><label for="book-style">文字气质</label><input id="book-style" name="style" required placeholder="克制、冷峻、轻盈" /></div></div></div>
+          <div class="form-section"><div class="form-step">04</div><div class="form-fields split-fields"><div><label for="book-length">预计篇幅</label><select id="book-length" name="length"><option>长篇</option><option>中篇</option><option>短篇</option></select></div><div><label for="book-words">每章字数</label><input id="book-words" name="chapterWords" required value="2500-3500" /></div></div></div>
+          <div class="form-section"><div class="form-step">05</div><div class="form-fields"><label>推进方式</label><div class="segmented"><label><input type="radio" name="mode" value="review" checked /><span><strong>分步审阅</strong><small>每一步都由你确认</small></span></label><label><input type="radio" name="mode" value="auto" /><span><strong>自动推进</strong><small>让世界连续生长</small></span></label></div></div></div>
+          <div class="form-actions"><button type="button" class="secondary-button" data-action="shelf">取消</button><button type="submit" class="primary-button">开始铸造世界 <span aria-hidden="true">→</span></button></div>
+        </form>
+      </section>
+    </template>
+
+    <template id="book-template">
+      <section class="view book-view"><div class="book-hero"><div><p class="eyebrow" id="book-genre-label">NOVEL PROJECT</p><h1 id="book-title-label"></h1><p id="book-premise-label" class="book-premise"></p></div><div class="book-hero-actions"><button class="secondary-button" data-export-format="md">导出 Markdown</button><button class="secondary-button" data-export-format="txt">导出 TXT</button><button class="primary-button" data-action="open-workbench">进入工作台 <span aria-hidden="true">→</span></button></div></div>
+        <div class="book-tabs" role="tablist"><button class="book-tab active" data-tab="overview" role="tab">总览</button><button class="book-tab" data-tab="world" role="tab">世界</button><button class="book-tab" data-tab="characters" role="tab">角色表</button><button class="book-tab" data-tab="story" role="tab">故事规划</button><button class="book-tab" data-tab="outline" role="tab">卷大纲</button><button class="book-tab" data-tab="workbench" role="tab">工作台</button></div><div id="book-panel" class="book-panel"></div>
+      </section>
+    </template>
   </body>
+  <script type="module" src="/app.js"></script>
 </html>
